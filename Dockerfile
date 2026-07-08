@@ -19,5 +19,5 @@ RUN npm run build
 
 EXPOSE 3000
 
-# Push schema to database and start Next.js
-CMD ["sh", "-c", "npx prisma db push && npm run start"]
+# Push schema to database, run seed, and start Next.js
+CMD ["sh", "-c", "npx prisma db push && npm run seed && npm run start"]
