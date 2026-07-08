@@ -7,13 +7,12 @@ RUN apk add --no-cache openssl
 
 # Install dependencies
 COPY package.json package-lock.json* ./
+# Copy prisma schema so postinstall hook (prisma generate) works
+COPY prisma ./prisma
 RUN npm ci
 
 # Copy all files
 COPY . .
-
-# Generate Prisma client
-RUN npx prisma generate
 
 # Build Next.js app
 RUN npm run build
