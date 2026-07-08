@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: ajarin_web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount uploads and prisma folders so data persists
+      - ./uploads:/app/uploads
+      - ./prisma:/app/prisma
+    environment:
+      - NODE_ENV=production
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: ajarin_tunnel
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    depends_on:
+      - web

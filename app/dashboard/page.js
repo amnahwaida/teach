@@ -19,7 +19,8 @@ import {
   PencilSquareIcon,
   ChartBarSquareIcon,
   TrashIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  ArrowUpTrayIcon
 } from '@heroicons/react/24/outline';
 
 function formatDate(dateStr) {
