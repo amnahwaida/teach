@@ -11,6 +11,8 @@ services:
       # Mount uploads and prisma folders so data persists
       - ./uploads:/app/uploads
       - ./prisma:/app/prisma
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
 
