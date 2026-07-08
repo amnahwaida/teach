@@ -16,3 +16,8 @@ prisma/dev.db-journal
 
 # Uploads
 uploads/
+
+# PWA files
+public/sw.js
+public/sw.js.map
+public/workbox-*.js

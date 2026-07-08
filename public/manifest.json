@@ -1,0 +1,21 @@
+{
+  "name": "Ajar.in - Platform Pembelajaran Interaktif",
+  "short_name": "Ajar.in",
+  "description": "Hosting media pembelajaran HTML dan kuis interaktif untuk siswa.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
