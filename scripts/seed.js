@@ -8,19 +8,21 @@ async function main() {
   console.log('🌱 Seeding database...');
 
   // Create admin user
-  const adminPassword = await bcrypt.hash('admin123', 12);
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@ajar.in';
+  const adminPass = process.env.ADMIN_PASSWORD || 'admin123';
+  const adminPassword = await bcrypt.hash(adminPass, 12);
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@ajar.in' },
+    where: { email: adminEmail },
     update: {},
     create: {
       name: 'Super Admin',
-      email: 'admin@ajar.in',
+      email: adminEmail,
       passwordHash: adminPassword,
       role: 'admin',
       status: 'active',
     },
   });
-  console.log(`✅ Admin created: ${admin.email} (password: admin123)`);
+  console.log(`✅ Admin created: ${admin.email} (password: ${adminPass})`);
 
   // Create demo teacher
   const guruPassword = await bcrypt.hash('guru123', 12);
@@ -37,9 +39,9 @@ async function main() {
   });
   console.log(`✅ Guru created: ${guru.email} (password: guru123)`);
 
-  console.log('\n🎉 Seed completed!');
+  console.log('🎉 Seed completed!');
   console.log('---');
-  console.log('Login sebagai Admin:  admin@ajar.in / admin123');
+  console.log(`Login sebagai Admin:  ${adminEmail} / ${adminPass}`);
   console.log('Login sebagai Guru:   guru@ajar.in / guru123');
 
   await prisma.$disconnect();
