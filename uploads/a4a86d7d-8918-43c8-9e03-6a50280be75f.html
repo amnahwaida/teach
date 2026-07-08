@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulasi Interaktif: Asas Kontinuitas Fluida Dinamis</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --primary: #38bdf8;
+            --secondary: #34d399;
+            --accent: #fbbf24;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3a8a, #0f172a);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            font-size: 2.2rem;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        @media (min-width: 900px) {
+            .grid {
+                grid-template-columns: 350px 1fr;
+            }
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        .card h2 {
+            font-size: 1.3rem;
+            color: var(--secondary);
+            margin-bottom: 15px;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .control-group label span.val {
+            color: var(--primary);
+            font-family: monospace;
+            font-size: 1.1rem;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: var(--border);
+            border-radius: 5px;
+            outline: none;
+            -webkit-appearance: none;
+            accent-color: var(--primary);
+        }
+
+        .formula-box {
+            background-color: rgba(15, 23, 42, 0.6);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            border-left: 4px solid var(--accent);
+        }
+
+        .formula {
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--accent);
+            margin: 10px 0;
+            font-family: 'Times New Roman', Times, serif;
+            letter-spacing: 1px;
+        }
+
+        .display-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .metric-tile {
+            background: rgba(51, 65, 85, 0.5);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+
+        .metric-tile .lbl {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .metric-tile .val {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--primary);
+            font-family: monospace;
+        }
+
+        .sim-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        canvas {
+            width: 100%;
+            background-color: #0b0f19;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            display: block;
+        }
+
+        .info-panel {
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        @media (min-width: 768px) {
+            .info-panel {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .explanation ul {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+
+        .explanation li {
+            margin-bottom: 5px;
+        }
+
+        .quiz-option {
+            background: rgba(51, 65, 85, 0.3);
+            border: 1px solid var(--border);
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .quiz-option:hover {
+            background: rgba(51, 65, 85, 0.7);
+            border-color: var(--primary);
+        }
+
+        .quiz-option.correct {
+            background: rgba(52, 211, 153, 0.2);
+            border-color: var(--secondary);
+            color: #34d399;
+        }
+
+        .quiz-option.wrong {
+            background: rgba(248, 113, 113, 0.2);
+            border-color: #f87171;
+            color: #f87171;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: var(--bg-color);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background-color: #7dd3fc;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Simulasi Interaktif Fluida Dinamis</h1>
+        <p>Eksplorasi Hukum / Asas Kontinuitas dalam Aliran Fluida</p>
+    </header>
+
+    <div class="grid">
+        <!-- Panel Kontrol -->
+        <div class="card">
+            <h2>⚙️ Kendali Simulasi</h2>
+            
+            <div class="control-group">
+                <label>Diameter Pipa 1 ($D_1$): <span class="val" id="d1-val">4.0 m</span></label>
+                <input type="range" id="d1-slider" min="2" max="6" step="0.1" value="4">
+            </div>
+
+            <div class="control-group">
+                <label>Diameter Pipa 2 ($D_2$): <span class="val" id="d2-val">2.0 m</span></label>
+                <input type="range" id="d2-slider" min="1" max="5" step="0.1" value="2">
+            </div>
+
+            <div class="control-group">
+                <label>Kecepatan Aliran 1 ($v_1$): <span class="val" id="v1-val">2.0 m/s</span></label>
+                <input type="range" id="v1-slider" min="0.5" max="5" step="0.1" value="2">
+            </div>
+
+            <div class="formula-box">
+                <p style="font-size: 0.9rem; color: var(--text-muted); text-align: center;">Persamaan Kontinuitas:</p>
+                <div class="formula">A₁ · v₁ = A₂ · v₂ = Q (Konstan)</div>
+            </div>
+
+            <div class="display-metrics">
+                <div class="metric-tile">
+                    <div class="lbl">Luas A₁</div>
+                    <div class="val" id="a1-metric">12.57 m²</div>
+                </div>
+                <div class="metric-tile">
+                    <div class="lbl">Luas A₂</div>
+                    <div class="val" id="a2-metric">3.14 m²</div>
+                </div>
+                <div class="metric-tile">
+                    <div class="lbl">Kecepatan v₂</div>
+                    <div class="val" id="v2-metric">8.00 m/s</div>
+                </div>
+                <div class="metric-tile">
+                    <div class="lbl">Debit Aliran (Q)</div>
+                    <div class="val" id="q-metric">25.13 m³/s</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Visualisasi -->
+        <div class="card sim-container">
+            <h2>🌊 Visualisasi Aliran Fluida</h2>
+            <canvas id="fluidCanvas" width="800" height="400"></canvas>
+            <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center;">
+                💡 *Amati bagaimana kerapatan dan kecepatan partikel (titik air) berubah ketika melewati penyempitan pipa.*
+            </p>
+        </div>
+    </div>
+
+    <!-- Panel Informasi Tambahan & Kuis -->
+    <div class="info-panel">
+        <div class="card explanation">
+            <h2>📘 Ringkasan Materi</h2>
+            <p><strong>Asas Kontinuitas</strong> menyatakan bahwa untuk fluida yang tidak termampatkan (incompressible) dan mengalir secara tunak (steady), laju aliran massa yang melewati setiap penampang pipa adalah konstan.</p>
+            <p style="margin-top: 10px;">Artinya, <strong>Debit ($Q$)</strong> fluida di setiap titik sepanjang aliran nilainya selalu sama:</p>
+            <ul>
+                <li>Jika penampang pipa <strong>melebar</strong> ($A$ besar), maka kecepatan aliran fluida akan <strong>melambat</strong> ($v$ kecil).</li>
+                <li>Jika penampang pipa <strong>menyempit</strong> ($A$ kecil), maka kecepatan aliran fluida akan <strong>meningkat</strong> ($v$ besar).</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>🧠 Uji Pemahamanmu!</h2>
+            <p id="quiz-question" style="margin-bottom: 15px; font-weight: 500;">Jika diameter pipa diperkecil menjadi setengah dari diameter semula, apa yang terjadi pada kecepatan alirannya?</p>
+            <div id="quiz-options">
+                <div class="quiz-option" onclick="checkAnswer(this, 0)">A. Menjadi setengah kali semula</div>
+                <div class="quiz-option" onclick="checkAnswer(this, 1)">B. Menjadi dua kali lipat semula</div>
+                <div class="quiz-option" onclick="checkAnswer(this, 2)">C. Menjadi empat kali lipat semula</div>
+                <div class="quiz-option" onclick="checkAnswer(this, 3)">D. Tetap tidak berubah</div>
+            </div>
+            <p id="quiz-feedback" style="margin-top: 10px; font-weight: bold; min-height: 24px;"></p>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('fluidCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Element references
+    const d1Slider = document.getElementById('d1-slider');
+    const d2Slider = document.getElementById('d2-slider');
+    const v1Slider = document.getElementById('v1-slider');
+
+    const d1Val = document.getElementById('d1-val');
+    const d2Val = document.getElementById('d2-val');
+    const v1Val = document.getElementById('v1-val');
+
+    const a1Metric = document.getElementById('a1-metric');
+    const a2Metric = document.getElementById('a2-metric');
+    const v2Metric = document.getElementById('v2-metric');
+    const qMetric = document.getElementById('q-metric');
+
+    // Simulation simulation variables
+    let d1 = parseFloat(d1Slider.value);
+    let d2 = parseFloat(d2Slider.value);
+    let v1 = parseFloat(v1Slider.value);
+
+    // Particle system
+    const particles = [];
+    const maxParticles = 180;
+
+    class Particle {
+        constructor(x = null) {
+            this.x = x !== null ? x : Math.random() * canvas.width;
+            // Relative vertical position from center line (-1 to 1)
+            this.pctY = (Math.random() * 2) - 1; 
+            this.color = `hsl(${190 + Math.random() * 20}, 90%, 65%)`;
+            this.size = 2 + Math.random() * 2;
+        }
+
+        update() {
+            // Get local height and velocity based on x coordinate
+            const localH = getPipeHalfHeight(this.x);
+            const v = getLocalVelocity(this.x);
+            
+            // Move horizontally based on local velocity
+            // scaled to make simulation speed visually pleasing
+            this.x += v * 1.5; 
+
+            // If particle exits canvas, reset to left side
+            if (this.x > canvas.width) {
+                this.x = 0;
+                this.pctY = (Math.random() * 2) - 1;
+            }
+        }
+
+        draw() {
+            const centerY = canvas.height / 2;
+            const h = getPipeHalfHeight(this.x);
+            const y = centerY + this.pctY * (h - 4); // margin from pipe walls
+
+            ctx.beginPath();
+            ctx.arc(this.x, y, this.size, 0, Math.PI * 2);
+            ctx.fillStyle = this.color;
+            ctx.shadowBlur = 4;
+            ctx.shadowColor = this.color;
+            ctx.fill();
+            ctx.shadowBlur = 0; // reset
+        }
+    }
+
+    // Initialize particles
+    for (let i = 0; i < maxParticles; i++) {
+        particles.push(new Particle());
+    }
+
+    // Pipe geometry definitions
+    const transStart = canvas.width * 0.35;
+    const transEnd = canvas.width * 0.65;
+
+    function getPipeHalfHeight(x) {
+        // Map diameters to pixel sizes
+        const r1_px = (d1 * 30); 
+        const r2_px = (d2 * 30);
+
+        if (x < transStart) return r1_px;
+        if (x > transEnd) return r2_px;
+
+        // Smooth transition zone (Smoothstep interpolation)
+        const t = (x - transStart) / (transEnd - transStart);
+        const smoothT = t * t * (3 - 2 * t);
+        return r1_px + (r2_px - r1_px) * smoothT;
+    }
+
+    function getLocalVelocity(x) {
+        const a1 = Math.PI * Math.pow(d1/2, 2);
+        const q = a1 * v1;
+        
+        // Find local diameter from local height in pixels
+        // height_px = radius_px -> diam_px = 2 * height_px
+        // conversion back: diam_m = diam_px / 30
+        const localH_px = getPipeHalfHeight(x);
+        const localD_m = (localH_px * 2) / 30;
+        const localA = Math.PI * Math.pow(localD_m / 2, 2);
+        
+        return q / localA;
+    }
+
+    function updateCalculations() {
+        d1 = parseFloat(d1Slider.value);
+        d2 = parseFloat(d2Slider.value);
+        v1 = parseFloat(v1Slider.value);
+
+        d1Val.innerText = d1.toFixed(1) + " m";
+        d2Val.innerText = d2.toFixed(1) + " m";
+        v1Val.innerText = v1.toFixed(1) + " m/s";
+
+        const r1 = d1 / 2;
+        const r2 = d2 / 2;
+
+        const a1 = Math.PI * r1 * r1;
+        const a2 = Math.PI * r2 * r2;
+        const q = a1 * v1;
+        const v2 = q / a2;
+
+        a1Metric.innerText = a1.toFixed(2) + " m²";
+        a2Metric.innerText = a2.toFixed(2) + " m²";
+        v2Metric.innerText = v2.toFixed(2) + " m/s";
+        qMetric.innerText = q.toFixed(2) + " m³/s";
+    }
+
+    function drawPipe() {
+        const centerY = canvas.height / 2;
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#475569';
+        
+        // Draw top boundary of the pipe
+        ctx.beginPath();
+        for (let x = 0; x <= canvas.width; x += 5) {
+            const h = getPipeHalfHeight(x);
+            if (x === 0) ctx.moveTo(x, centerY - h);
+            else ctx.lineTo(x, centerY - h);
+        }
+        ctx.stroke();
+
+        // Draw bottom boundary of the pipe
+        ctx.beginPath();
+        for (let x = 0; x <= canvas.width; x += 5) {
+            const h = getPipeHalfHeight(x);
+            if (x === 0) ctx.moveTo(x, centerY + h);
+            else ctx.lineTo(x, centerY + h);
+        }
+        ctx.stroke();
+
+        // Draw section indicators/labels
+        ctx.font = 'bold 14px sans-serif';
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText("Penampang 1 (A₁)", 30, centerY - getPipeHalfHeight(0) - 15);
+        ctx.fillText("Penampang 2 (A₂)", canvas.width - 160, centerY - getPipeHalfHeight(canvas.width) - 15);
+    }
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw subtle fluid background flow representation
+        const centerY = canvas.height / 2;
+        ctx.fillStyle = 'rgba(14, 165, 233, 0.05)';
+        ctx.beginPath();
+        ctx.moveTo(0, centerY - getPipeHalfHeight(0));
+        for (let x = 0; x <= canvas.width; x += 10) {
+            ctx.lineTo(x, centerY - getPipeHalfHeight(x));
+        }
+        ctx.lineTo(canvas.width, centerY + getPipeHalfHeight(canvas.width));
+        for (let x = canvas.width; x >= 0; x -= 10) {
+            ctx.lineTo(x, centerY + getPipeHalfHeight(x));
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // Update and draw particles
+        particles.forEach(p => {
+            p.update();
+            p.draw();
+        });
+
+        // Draw the static pipe outline over particles
+        drawPipe();
+
+        requestAnimationFrame(animate);
+    }
+
+    // Event listeners
+    d1Slider.addEventListener('input', updateCalculations);
+    d2Slider.addEventListener('input', updateCalculations);
+    v1Slider.addEventListener('input', updateCalculations);
+
+    // Quiz logic
+    function checkAnswer(element, index) {
+        const feedback = document.getElementById('quiz-feedback');
+        const options = document.querySelectorAll('.quiz-option');
+        
+        // Clear previous state
+        options.forEach(opt => {
+            opt.classList.remove('correct', 'wrong');
+        });
+
+        if (index === 2) { // Option C is correct
+            element.classList.add('correct');
+            feedback.innerText = "🎉 Betul sekali! Luas penampang berbanding lurus dengan kuadrat diameter (A ∝ D²). Jika D menjadi 1/2 kali, maka A menjadi 1/4 kali semula. Berdasarkan Asas Kontinuitas (A₁v₁ = A₂v₂), kecepatan v akan naik 4 kali lipat!";
+            feedback.style.color = "#34d399";
+        } else {
+            element.classList.add('wrong');
+            options[2].classList.add('correct'); // Highlight the right answer
+            feedback.innerText = "❌ Kurang tepat. Coba perhatikan hubungan kuadrat diameter terhadap luas lingkaran penampang!";
+            feedback.style.color = "#f87171";
+        }
+    }
+
+    // Start everything
+    updateCalculations();
+    animate();
+</script>
+
+</body>
+</html>

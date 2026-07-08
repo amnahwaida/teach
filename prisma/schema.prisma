@@ -1,0 +1,52 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         String   @default("guru") // 'admin' | 'guru'
+  status       String   @default("active") // 'active' | 'suspended'
+  createdAt    DateTime @default(now()) @map("created_at")
+  modules      Module[]
+
+  @@map("users")
+}
+
+model Module {
+  id          String       @id @default(uuid())
+  userId      String       @map("user_id")
+  title       String
+  shortCode   String       @unique @map("short_code")
+  filePath    String       @map("file_path")
+  fileSizeBytes Int        @map("file_size_bytes")
+  isActive    Boolean      @default(true) @map("is_active")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submissions Submission[]
+
+  @@map("modules")
+}
+
+model Submission {
+  id           String   @id @default(uuid())
+  moduleId     String   @map("module_id")
+  studentName  String   @map("student_name")
+  studentClass String   @map("student_class")
+  score        Float
+  answersJson  String?  @map("answers_json") // JSON string for answer details
+  submittedAt  DateTime @default(now()) @map("submitted_at")
+  module       Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@map("submissions")
+}
