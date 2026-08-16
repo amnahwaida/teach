@@ -177,6 +177,14 @@ func (s *Server) securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		// halaman memakai inline style/script (css var, JS inline), jadi
+		// 'unsafe-inline' diperlukan; sisanya dibatasi ke origin sendiri
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'")
+		// HSTS hanya dikirim saat koneksi sudah HTTPS (backend bisa di belakang
+		// TLS terminator langsung atau tunnel)
+		if r.TLS != nil {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
 		next.ServeHTTP(w, r)
 	})
 }

@@ -1,6 +1,7 @@
 package render
 
 import (
+	"bytes"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -78,8 +79,17 @@ func funcMap() template.FuncMap {
 			}
 			return sum / float64(len(s))
 		},
-		"add": func(a, b int) int { return a + b },
+		"add":      func(a, b int) int { return a + b },
+		"initials": initials,
 	}
+}
+
+// initials mengambil huruf pertama yang valid (aman untuk UTF-8 multi-byte).
+func initials(name string) string {
+	for _, r := range name {
+		return string(r)
+	}
+	return "?"
 }
 
 var tmpl *template.Template
@@ -124,13 +134,18 @@ func Error(w http.ResponseWriter, status int, message string) {
 	JSON(w, status, map[string]string{"error": message})
 }
 
-// View menulis halaman sesuai nama template.
+// View menulis halaman sesuai nama template. Template dirender ke buffer
+// dulu agar kegagalan render tidak meninggalkan body parsial dengan status 200.
 func View(w http.ResponseWriter, name string, data any) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := tmpl.ExecuteTemplate(w, "layout-"+name, data); err != nil {
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "layout-"+name, data); err != nil {
 		fmt.Printf("render error %s: %v\n", name, err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
 	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(buf.Bytes())
 }
 
 // NotFound halaman sederhana.

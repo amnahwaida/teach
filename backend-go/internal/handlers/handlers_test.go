@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -229,6 +230,74 @@ func TestValidEmail(t *testing.T) {
 		if validEmail(e) {
 			t.Errorf("%q harus invalid", e)
 		}
+	}
+}
+
+// ---------- securityHeaders (CSP/HSTS) ----------
+
+func TestSecurityHeadersCSP(t *testing.T) {
+	handler := (&Server{}).securityHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest("GET", "/dashboard", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	checks := map[string]string{
+		"X-Content-Type-Options": "nosniff",
+		"Referrer-Policy":        "strict-origin-when-cross-origin",
+		"X-Frame-Options":        "SAMEORIGIN",
+		"Permissions-Policy":     "camera=(), microphone=(), geolocation=()",
+	}
+	for h, v := range checks {
+		if got := rec.Header().Get(h); got != v {
+			t.Errorf("header %s = %q, want %q", h, got, v)
+		}
+	}
+
+	csp := rec.Header().Get("Content-Security-Policy")
+	if csp == "" {
+		t.Fatal("CSP wajib ada")
+	}
+	for _, need := range []string{
+		"default-src 'self'",
+		"object-src 'none'",
+		"base-uri 'self'",
+		"form-action 'self'",
+		"frame-ancestors 'self'",
+		"connect-src 'self'",
+	} {
+		if !strings.Contains(csp, need) {
+			t.Errorf("CSP harus memuat %q; got: %s", need, csp)
+		}
+	}
+
+	// tanpa TLS: HSTS tidak boleh muncul
+	if got := rec.Header().Get("Strict-Transport-Security"); got != "" {
+		t.Errorf("HSTS tidak boleh dikirim via HTTP, got %q", got)
+	}
+}
+
+func TestSecurityHeadersHSTSHanyaViaTLS(t *testing.T) {
+	handler := (&Server{}).securityHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	ts := httptest.NewTLSServer(handler)
+	defer ts.Close()
+
+	resp, err := ts.Client().Get(ts.URL)
+	if err != nil {
+		t.Fatalf("request TLS gagal: %v", err)
+	}
+	defer resp.Body.Close()
+
+	hsts := resp.Header.Get("Strict-Transport-Security")
+	if hsts != "max-age=31536000; includeSubDomains" {
+		t.Fatalf("HSTS via TLS = %q, want max-age=31536000; includeSubDomains", hsts)
+	}
+	if csp := resp.Header.Get("Content-Security-Policy"); csp == "" {
+		t.Fatal("CSP harus ada juga via TLS")
 	}
 }
 

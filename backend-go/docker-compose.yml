@@ -3,11 +3,13 @@ services:
     image: postgres:16-alpine
     container_name: ajarin_db
     restart: unless-stopped
+    # hanya bind ke localhost: database TIDAK boleh terekspos publik.
+    # Untuk multi-host/remote, arahkan DATABASE_URL ke instance lain.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_USER: ajar
-      POSTGRES_PASSWORD: ajar
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD harus disetel (lihat .env.example)}
       POSTGRES_DB: ajar
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -26,17 +28,17 @@ services:
     volumes:
       - ./uploads:/app/uploads
     environment:
-      DATABASE_URL: postgres://ajar:ajar@db:5432/ajar?sslmode=disable
+      DATABASE_URL: postgres://ajar:${DB_PASSWORD}@db:5432/ajar?sslmode=disable
       PORT: "3000"
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@ajar.in}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?ADMIN_EMAIL harus disetel (lihat .env.example)}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD harus disetel (lihat .env.example)}
       APP_URL: ${APP_URL:-http://localhost:3000}
     depends_on:
       db:
         condition: service_healthy
 
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.8.2
     container_name: ajarin_tunnel
     restart: unless-stopped
     command: tunnel run

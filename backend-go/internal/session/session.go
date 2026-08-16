@@ -73,8 +73,10 @@ func (s *Store) Get(ctx context.Context, token string) (*models.User, error) {
 	if err == pgx.ErrNoRows {
 		// cek apakah session ada tapi expired (untuk error message yang tepat)
 		var exists bool
-		_ = s.pool.QueryRow(ctx,
-			`SELECT EXISTS(SELECT 1 FROM sessions WHERE token = $1)`, token).Scan(&exists)
+		if err := s.pool.QueryRow(ctx,
+			`SELECT EXISTS(SELECT 1 FROM sessions WHERE token = $1)`, token).Scan(&exists); err != nil {
+			return nil, err
+		}
 		if exists {
 			return nil, ErrExpired
 		}

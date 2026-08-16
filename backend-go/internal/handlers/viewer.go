@@ -52,7 +52,9 @@ func (s *Server) viewerPage(w http.ResponseWriter, r *http.Request) {
 
 	render.View(w, "viewer", struct {
 		render.PageData
-		Module models.Module
+		Module   models.Module
+		Error    string
+		NotFound bool
 	}{
 		PageData: render.PageData{Title: m.Title},
 		Module:   m,

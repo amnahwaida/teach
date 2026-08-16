@@ -1,5 +1,5 @@
-# Backend Go
-backend-go/ajar
-backend-go/.env
-backend-go/uploads/
+# Backend Go (path relatif ke direktori ini)
+ajar
+.env
+uploads/
 *.log

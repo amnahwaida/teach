@@ -26,13 +26,22 @@ server-rendered dengan `html/template`, PostgreSQL, session server-side.
 | Login tanpa batasan percobaan | Rate limit login 10 percobaan/15 mnt per IP (form + API) |
 | Body JSON tak terbatas | `MaxBytesReader` 1MB di semua endpoint JSON |
 | Slowloris / koneksi macet | `ReadTimeout`/`WriteTimeout` di `http.Server` |
+| Login dibedah lewat timing (user tidak dikenal diproses lebih cepat) | Bcrypt dummy dijalankan saat email tidak ditemukan |
+| Modul guru bisa membaca DOM & cookie sesi siswa (sandbox `allow-same-origin`) | iframe viewer `sandbox="allow-scripts"` saja + `postMessage` memeriksa `event.origin` |
+| Tidak ada CSP/HSTS di halaman aplikasi | CSP strict di semua response + HSTS saat HTTPS |
+| Password admin tersimpan tidak sinkron dengan env | Peringatan di log bila `ADMIN_PASSWORD` ≠ hash tersimpan |
+| Awal inisial nama bisa putus di tengah UTF-8 (`{{slice}}`) | Fungsi template `initials` aman untuk rune |
 
 ## Menjalankan
 
 ```bash
-cp .env.example .env   # setel ADMIN_EMAIL / ADMIN_PASSWORD / APP_URL
+cp .env.example .env   # WAJIB: DB_PASSWORD, ADMIN_EMAIL, ADMIN_PASSWORD
 docker compose up -d --build
 ```
+
+Compose mewajibkan `DB_PASSWORD`, `ADMIN_EMAIL`, dan `ADMIN_PASSWORD` dari
+`.env` (sintaks `${VAR:?}` gagal bila kosong). Port PostgreSQL hanya terikat
+ke `127.0.0.1`. Image `cloudflared` dipin ke versi stabil.
 
 Atau tanpa Docker (butuh PostgreSQL):
 
@@ -87,20 +96,24 @@ satu binary + volume uploads.
   multi-instance, pindahkan ke Redis.
 - `clientIP` hanya memakai `RemoteAddr` (bukan `X-Forwarded-For`). Saat
   berjalan di belakang banyak proxy, ganti dengan daftar trusted proxy.
+- Semua response diberi CSP `default-src 'self'`; HSTS hanya dikirim saat
+  request masuk lewat TLS (`r.TLS != nil`) agar aman di belakang tunnel.
+- Cookie sesi memakai `SameSite=Lax` + `Secure` bila `APP_URL` diawali `https://`.
+- Render halaman dibuffer dulu; kegagalan template tidak pernah
+  menghasilkan body parsial dengan status 200.
+- `docker compose up` tanpa `.env` akan gagal cepat (hindari default password lemah).
+- Redaksi `cloudflared` di compose menunjuk versi stabil; perbarui bila
+  ada rilis baru (peringatan memakai versi lama tidak wajib).
 
 ## Testing
 
-Unit test (tanpa DB):
-
-```bash
-go test ./...
-```
+Unit test (tanpa DB): `go test ./...`.
 
 Integration test (butuh PostgreSQL, gunakan service `db` dari compose):
 
 ```bash
 docker compose up -d db
-go test -v ./internal/handlers/
+go test -v ./internal/handlers/ ./internal/session/
 ```
 
 Integration test otomatis membuat database `ajar_test` (migrasi + TRUNCATE

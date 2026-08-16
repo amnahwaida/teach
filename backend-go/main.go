@@ -80,6 +80,15 @@ func seedAdmin(ctx context.Context, pool *pgxpool.Pool, cfg *config.Config) {
 		return
 	}
 	if exists {
+		// password admin TIDAK diubah otomatis dari env (keamanan); beri
+		// peringatan bila env berbeda dengan yang tersimpan
+		var hash string
+		if err := pool.QueryRow(ctx,
+			`SELECT password_hash FROM users WHERE email = $1`, cfg.AdminEmail).Scan(&hash); err == nil {
+			if !auth.ComparePassword(cfg.AdminPassword, hash) {
+				log.Printf("PERINGATAN: ADMIN_PASSWORD berbeda dengan password %s yang tersimpan — password tidak diubah otomatis, ubah manual jika perlu", cfg.AdminEmail)
+			}
+		}
 		return
 	}
 

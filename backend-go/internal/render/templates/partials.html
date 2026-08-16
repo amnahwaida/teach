@@ -52,7 +52,7 @@
   <div class="sidebar-footer">
     <div style="display:flex;align-items:center;gap:.75rem;padding:.5rem 0;margin-bottom:.5rem">
       <div style="width:36px;height:36px;border-radius:var(--radius-sm);background:var(--gradient-primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.875rem;color:white;flex-shrink:0">
-        {{if .User.Name}}{{slice .User.Name 0 1}}{{else}}?{{end}}
+        {{initials .User.Name}}
       </div>
       <div style="min-width:0">
         <div style="font-weight:600;font-size:.85rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{.User.Name}}</div>

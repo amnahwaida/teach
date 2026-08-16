@@ -3,9 +3,13 @@ package render
 import (
 	"bytes"
 	"html/template"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vannyezha/ajar-in/internal/models"
 )
 
 // renderFmt menjalankan ekspresi template dengan funcs produksi.
@@ -66,6 +70,77 @@ func TestAvgDanAdd(t *testing.T) {
 	if got := renderFmt(t, `{{add 2 3}}`, nil); got != "5" {
 		t.Errorf("add = %q, want \"5\"", got)
 	}
+}
+
+func TestInitials(t *testing.T) {
+	if got := initials("Budi"); got != "B" {
+		t.Errorf("initials(Budi) = %q, want \"B\"", got)
+	}
+	if got := initials(""); got != "?" {
+		t.Errorf("initials(\"\") = %q, want \"?\"", got)
+	}
+	// karakter multi-byte (emoji) tidak boleh terpotong di tengah
+	if got := initials("🧠 Naufal"); got != "🧠" {
+		t.Errorf("initials emoji = %q, want \"🧠\"", got)
+	}
+}
+
+// TestViewerSandboxTanpaSameOrigin mengunci: konten modul guru tidak boleh
+// mendapat akses origin penuh (tanpa allow-same-origin) dan pesan postMessage
+// dari window lain harus ditolak.
+func TestViewerSandboxTanpaSameOrigin(t *testing.T) {
+	rec := httptest.NewRecorder()
+	View(rec, "viewer", struct {
+		PageData
+		Module   models.Module
+		Error    string
+		NotFound bool
+	}{
+		PageData: PageData{Title: "Uji"},
+		Module:   models.Module{ID: "m1", Title: "Modul Uji", ShortCode: "abc", IsActive: true},
+	})
+
+	out := rec.Body.String()
+	if !strings.Contains(out, `sandbox="allow-scripts"`) {
+		t.Fatalf("iframe harus punya sandbox=\"allow-scripts\":\n%s", snippet(out, "iframe"))
+	}
+	if strings.Contains(out, "allow-same-origin") {
+		t.Fatalf("sandbox TIDAK boleh mengandung allow-same-origin:\n%s", snippet(out, "iframe"))
+	}
+	if !strings.Contains(out, "event.origin !== window.location.origin") {
+		t.Fatalf("listener message harus memeriksa origin:\n%s", snippet(out, "message"))
+	}
+}
+
+// TestViewKegagalanRenderMenghasilkan500: render yang gagal tidak boleh
+// menulis body parsial dengan status 200.
+func TestViewKegagalanRenderMenghasilkan500(t *testing.T) {
+	rec := httptest.NewRecorder()
+	View(rec, "tidak-ada-template-xyz", PageData{Title: "x"})
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status harus 500, dapat %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "Internal Server Error") {
+		t.Fatalf("body harus memuat pesan error server, dapat: %q", rec.Body.String())
+	}
+}
+
+// snippet mengambil sekeliling teks pertama di output untuk pesan error.
+func snippet(out, needle string) string {
+	i := strings.Index(out, needle)
+	if i < 0 {
+		return out[:300]
+	}
+	lo := i - 120
+	if lo < 0 {
+		lo = 0
+	}
+	hi := i + 200
+	if hi > len(out) {
+		hi = len(out)
+	}
+	return out[lo:hi]
 }
 
 func TestTemplateLayoutsTersedia(t *testing.T) {

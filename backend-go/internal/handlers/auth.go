@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/vannyezha/ajar-in/internal/auth"
 	"github.com/vannyezha/ajar-in/internal/models"
 	"github.com/vannyezha/ajar-in/internal/render"
@@ -15,6 +17,10 @@ const (
 	loginLimiterMax   = 10
 	loginLimiterEvery = 15 * time.Minute
 )
+
+// dummyHash dibandingkan saat email tidak ditemukan agar waktu respons
+// tidak membocorkan keberadaan akun (anti user-enumeration via timing).
+var dummyHash, _ = auth.HashPassword("dummy-password-timing-2026")
 
 func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
 	if userFrom(r) != nil {
@@ -53,7 +59,17 @@ func (s *Server) loginPost(w http.ResponseWriter, r *http.Request) {
 		FROM users WHERE email = $1
 	`, email).Scan(&user.ID, &user.Name, &user.Email, &user.PasswordHash,
 		&user.Role, &user.Status, &user.CreatedAt)
-	if err != nil || !auth.ComparePassword(password, user.PasswordHash) {
+	if err == pgx.ErrNoRows {
+		// tetap jalankan bcrypt agar waktu tidak membocorkan email yang tidak ada
+		_ = auth.ComparePassword(password, dummyHash)
+		http.Redirect(w, r, "/login?err="+urlEscape("Email atau password salah"), http.StatusFound)
+		return
+	}
+	if err != nil {
+		http.Redirect(w, r, "/login?err="+urlEscape("Terjadi kesalahan server"), http.StatusFound)
+		return
+	}
+	if !auth.ComparePassword(password, user.PasswordHash) {
 		http.Redirect(w, r, "/login?err="+urlEscape("Email atau password salah"), http.StatusFound)
 		return
 	}
@@ -128,7 +144,17 @@ func (s *Server) apiLogin(w http.ResponseWriter, r *http.Request) {
 		FROM users WHERE email = $1
 	`, req.Email).Scan(&user.ID, &user.Name, &user.Email, &user.PasswordHash,
 		&user.Role, &user.Status, &user.CreatedAt)
-	if err != nil || !auth.ComparePassword(req.Password, user.PasswordHash) {
+	if err == pgx.ErrNoRows {
+		// anti user-enumeration via timing
+		_ = auth.ComparePassword(req.Password, dummyHash)
+		render.Error(w, http.StatusUnauthorized, "Email atau password salah")
+		return
+	}
+	if err != nil {
+		serverError(w, "Gagal memuat pengguna", err)
+		return
+	}
+	if !auth.ComparePassword(req.Password, user.PasswordHash) {
 		render.Error(w, http.StatusUnauthorized, "Email atau password salah")
 		return
 	}
@@ -187,5 +213,7 @@ func (s *Server) clearSession(r *http.Request, w http.ResponseWriter) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   s.cfg.AppURL != "" && strings.HasPrefix(s.cfg.AppURL, "https://"),
+		SameSite: http.SameSiteLaxMode,
 	})
 }
