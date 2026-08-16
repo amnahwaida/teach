@@ -1,0 +1,103 @@
+{{define "head-common"}}
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} · Ajar.in</title>
+<link rel="stylesheet" href="/assets/css/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%233b82f6'/><text x='50' y='68' font-size='56' font-family='sans-serif' font-weight='800' text-anchor='middle' fill='white'>A</text></svg>">
+{{end}}
+
+{{define "dashboard-script"}}
+<script>
+(function () {
+  const menuBtn = document.getElementById('menuBtn');
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  function toggle(open) {
+    if (sidebar) sidebar.classList.toggle('open', open);
+    if (backdrop) backdrop.style.display = open ? 'block' : 'none';
+  }
+  if (menuBtn) menuBtn.addEventListener('click', function () { toggle(!sidebar.classList.contains('open')); });
+  if (backdrop) backdrop.addEventListener('click', function () { toggle(false); });
+})();
+</script>
+{{end}}
+
+{{define "sidebar"}}
+{{$active := .Active}}
+<aside id="sidebar" class="sidebar">
+  <div class="sidebar-brand">
+    <div class="sidebar-brand-logo">A</div>
+    {{if eq .User.Role "admin"}}<span class="sidebar-brand-text">Ajar.in Admin</span>{{else}}<span class="sidebar-brand-text">Ajar.in</span>{{end}}
+  </div>
+  <nav class="sidebar-nav">
+    {{if eq .User.Role "admin"}}
+      <a href="/admin" class="sidebar-link {{if eq $active "admin"}}active{{end}}">
+        <span class="sidebar-link-icon">📊</span><span>Dashboard</span>
+      </a>
+      <a href="/admin/guru" class="sidebar-link {{if eq $active "guru"}}active{{end}}">
+        <span class="sidebar-link-icon">👨‍🏫</span><span>Kelola Guru</span>
+      </a>
+    {{else}}
+      <a href="/dashboard" class="sidebar-link {{if eq $active "dashboard"}}active{{end}}">
+        <span class="sidebar-link-icon">📊</span><span>Dashboard</span>
+      </a>
+      <a href="/dashboard/upload" class="sidebar-link {{if eq $active "upload"}}active{{end}}">
+        <span class="sidebar-link-icon">⬆️</span><span>Upload Modul</span>
+      </a>
+      <a href="/dashboard/prompt" class="sidebar-link {{if eq $active "prompt"}}active{{end}}">
+        <span class="sidebar-link-icon">📖</span><span>Pustaka Prompt</span>
+      </a>
+    {{end}}
+  </nav>
+  <div class="sidebar-footer">
+    <div style="display:flex;align-items:center;gap:.75rem;padding:.5rem 0;margin-bottom:.5rem">
+      <div style="width:36px;height:36px;border-radius:var(--radius-sm);background:var(--gradient-primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.875rem;color:white;flex-shrink:0">
+        {{if .User.Name}}{{slice .User.Name 0 1}}{{else}}?{{end}}
+      </div>
+      <div style="min-width:0">
+        <div style="font-weight:600;font-size:.85rem;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{.User.Name}}</div>
+        <div style="font-size:.75rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{.User.Email}}</div>
+      </div>
+    </div>
+    <form method="POST" action="/logout" style="width:100%">
+      <button type="submit" class="btn btn-ghost w-full" style="color:var(--danger-500);justify-content:flex-start">🚪 Keluar</button>
+    </form>
+  </div>
+</aside>
+{{end}}
+
+{{define "mobile-topbar"}}
+<div class="mobile-topbar">
+  <button id="menuBtn" class="mobile-menu-btn" aria-label="Toggle menu">☰</button>
+  <span style="font-weight:800;font-size:1.125rem;background:var(--gradient-primary);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Ajar.in</span>
+  <div style="width:36px"></div>
+</div>
+{{end}}
+
+{{define "flash"}}
+{{if .Flash}}<div class="flash flash-success"><span>✅</span><span>{{.Flash}}</span></div>{{end}}
+{{if .FlashErr}}<div class="flash flash-error"><span>⚠️</span><span>{{.FlashErr}}</span></div>{{end}}
+{{end}}
+
+{{define "copy-script"}}
+<script>
+function copyToClipboard(text, btn) {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(function(){ feedback(btn); }, function(){ fallback(text, btn); });
+  } else { fallback(text, btn); }
+}
+function fallback(text, btn) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); feedback(btn); } catch(e) {}
+  document.body.removeChild(ta);
+}
+function feedback(btn) {
+  const old = btn.innerHTML;
+  btn.innerHTML = '✅ Tersalin!';
+  btn.classList.add('copy-feedback');
+  setTimeout(function(){ btn.innerHTML = old; btn.classList.remove('copy-feedback'); }, 1500);
+}
+</script>
+{{end}}

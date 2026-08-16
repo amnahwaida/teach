@@ -1,0 +1,5 @@
+# Backend Go
+backend-go/ajar
+backend-go/.env
+backend-go/uploads/
+*.log

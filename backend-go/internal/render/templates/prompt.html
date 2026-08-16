@@ -1,0 +1,78 @@
+{{define "layout-prompt"}}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  {{template "head-common" .}}
+</head>
+<body>
+  <div id="sidebarBackdrop" class="sidebar-backdrop" style="display:none"></div>
+  {{template "sidebar" .}}
+
+  <main class="main-content">
+    {{template "mobile-topbar" .}}
+
+    <div class="page-header">
+      <h1>📖 Pustaka Prompt</h1>
+      <p>Kumpulan prompt siap pakai untuk membuat media pembelajaran interaktif dengan AI (ChatGPT/Gemini).</p>
+    </div>
+
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.5rem" id="filters">
+      <button type="button" class="btn btn-primary btn-sm" data-cat="all" onclick="filterPrompts('all')">Semua</button>
+      {{range .Categories}}
+      <button type="button" class="btn btn-secondary btn-sm" data-cat="{{.}}" onclick="filterPrompts('{{.}}')">{{.}}</button>
+      {{end}}
+    </div>
+
+    <div class="stats-grid" style="grid-template-columns:1fr" id="promptList">
+      {{range .Prompts}}
+      <div class="prompt-card" data-cat="{{.Category}}">
+        <div class="prompt-card-header">
+          <div class="prompt-card-icon">{{.Icon}}</div>
+          <div>
+            <div class="prompt-card-category">{{.Category}}</div>
+            <div class="prompt-card-title">{{.Title}}</div>
+          </div>
+        </div>
+        <p class="prompt-card-desc">{{.Description}}</p>
+
+        <div class="form-group">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;gap:1rem;flex-wrap:wrap">
+            <span class="form-label" style="margin:0">📋 Cara pakai</span>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleGuide(this)">Lihat Panduan</button>
+          </div>
+          <div class="prompt-content" style="display:none;white-space:normal" data-guide>{{.Guide}}</div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;gap:1rem;flex-wrap:wrap">
+            <span class="form-label" style="margin:0">🤖 Prompt untuk AI</span>
+            <button type="button" class="btn btn-primary btn-sm" onclick="copyToClipboard(this.parentNode.parentNode.querySelector('[data-text]').textContent, this)">📋 Salin Prompt</button>
+          </div>
+          <div class="prompt-content" data-text>{{.Prompt}}</div>
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </main>
+
+  {{template "copy-script" .}}
+  {{template "dashboard-script" .}}
+  <script>
+  function filterPrompts(cat) {
+    document.querySelectorAll('#filters .btn').forEach(function (b) { b.classList.remove('btn-primary'); b.classList.add('btn-secondary'); });
+    const btn = document.querySelector('#filters [data-cat="' + cat + '"]');
+    btn.classList.remove('btn-secondary'); btn.classList.add('btn-primary');
+    document.querySelectorAll('#promptList .prompt-card').forEach(function (card) {
+      card.style.display = (cat === 'all' || card.dataset.cat === cat) ? '' : 'none';
+    });
+  }
+  function toggleGuide(btn) {
+    const guide = btn.closest('.form-group').querySelector('[data-guide]');
+    const open = guide.style.display !== 'none';
+    guide.style.display = open ? 'none' : 'block';
+    btn.textContent = open ? 'Lihat Panduan' : 'Sembunyikan';
+  }
+  </script>
+</body>
+</html>
+{{end}}

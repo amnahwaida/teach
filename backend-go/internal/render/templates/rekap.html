@@ -1,0 +1,87 @@
+{{define "layout-rekap"}}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  {{template "head-common" .}}
+  <script>
+  function downloadCSV() {
+    window.location.href = '/api/modules/{{.Module.ID}}/rekap?format=csv';
+  }
+  </script>
+</head>
+<body>
+  <div id="sidebarBackdrop" class="sidebar-backdrop" style="display:none"></div>
+  {{template "sidebar" .}}
+
+  <main class="main-content">
+    {{template "mobile-topbar" .}}
+
+    <div style="margin-bottom:1.5rem">
+      <a href="/dashboard" style="display:inline-flex;align-items:center;gap:.375rem;color:var(--text-secondary);font-size:.875rem;margin-bottom:.75rem">← Kembali ke Dashboard</a>
+      <div class="page-header" style="margin-bottom:0">
+        <h1>📊 Rekap Penilaian</h1>
+        <p>{{.Module.Title}}</p>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card blue">
+        <div class="stat-card-icon">👨‍🎓</div>
+        <div class="stat-card-value">{{.TotalStudents}}</div>
+        <div class="stat-card-label">Total Siswa</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-card-icon">📈</div>
+        <div class="stat-card-value">{{formatScore .AvgScore}}</div>
+        <div class="stat-card-label">Rata-rata Skor</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-card-icon">🏆</div>
+        <div class="stat-card-value">{{formatScore .MaxScore}}</div>
+        <div class="stat-card-label">Skor Tertinggi</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-card-icon">📉</div>
+        <div class="stat-card-value">{{formatScore .MinScore}}</div>
+        <div class="stat-card-label">Skor Terendah</div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;margin-bottom:1rem">
+      <button type="button" class="btn btn-primary btn-sm" onclick="downloadCSV()">⬇️ Download CSV</button>
+    </div>
+
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>No</th>
+            <th>Nama Siswa</th>
+            <th>Kelas</th>
+            <th>Skor</th>
+            <th>Waktu Pengerjaan</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range $i, $s := .Submissions}}
+          <tr>
+            <td data-label="No">{{add $i 1}}</td>
+            <td data-label="Nama"><strong>{{.StudentName}}</strong></td>
+            <td data-label="Kelas"><span class="badge badge-info">{{.StudentClass}}</span></td>
+            <td data-label="Skor">
+              <span class="badge" style="background:{{scoreBg .Score}};color:{{scoreColor .Score}}">{{formatScore .Score}}</span>
+            </td>
+            <td data-label="Waktu">{{formatDate .SubmittedAt}}</td>
+          </tr>
+          {{else}}
+          <tr class="empty-table-row"><td colspan="5">Belum ada siswa yang mengerjakan modul ini.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  {{template "dashboard-script" .}}
+</body>
+</html>
+{{end}}

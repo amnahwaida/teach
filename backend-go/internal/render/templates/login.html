@@ -1,0 +1,35 @@
+{{define "layout-login"}}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  {{template "head-common" .}}
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="login-logo-icon">A</div>
+        <h1>Ajar.in</h1>
+        <p>Platform media pembelajaran interaktif</p>
+      </div>
+
+      {{if .FlashErr}}
+      <div class="flash flash-error" style="margin-bottom:1.25rem"><span>⚠️</span><span>{{.FlashErr}}</span></div>
+      {{end}}
+
+      <form method="POST" action="/login">
+        <div class="form-group">
+          <label class="form-label" for="email">Email</label>
+          <input id="email" name="email" type="email" class="form-input" placeholder="nama@sekolah.sch.id" required autofocus autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <input id="password" name="password" type="password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg w-full" style="margin-top:.25rem">Masuk</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
+{{end}}

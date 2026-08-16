@@ -1,0 +1,120 @@
+{{define "layout-upload"}}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  {{template "head-common" .}}
+</head>
+<body>
+  <div id="sidebarBackdrop" class="sidebar-backdrop" style="display:none"></div>
+  {{template "sidebar" .}}
+
+  <main class="main-content">
+    {{template "mobile-topbar" .}}
+
+    <div class="page-header">
+      <h1>⬆️ Upload Modul</h1>
+      <p>Unggah media pembelajaran HTML (satu file, maksimal 5MB).</p>
+    </div>
+
+    {{template "flash" .}}
+
+    <div class="card" style="max-width:720px;margin:0 auto">
+      <div id="dropZone" class="upload-zone">
+        <div class="upload-zone-icon">📄</div>
+        <div class="upload-zone-text"><strong>Seret &amp; lepas file HTML di sini</strong></div>
+        <div class="upload-zone-hint">atau klik untuk memilih file · hanya .html / .htm · maks 5MB</div>
+        <input id="fileInput" type="file" accept=".html,.htm,text/html" style="display:none">
+      </div>
+      <div id="fileSelected" class="flash flash-success" style="display:none;margin-top:1rem"><span>📎</span><span id="fileName"></span></div>
+      <div id="uploadError" class="flash flash-error" style="display:none;margin-top:1rem"><span>⚠️</span><span id="uploadErrorText"></span></div>
+
+      <form id="uploadForm" style="margin-top:1.5rem">
+        <div class="form-group">
+          <label class="form-label" for="title">Judul Modul <span style="color:var(--danger-500)">*</span></label>
+          <input id="title" class="form-input" placeholder="Contoh: Kuis Sistem Tata Surya - IPA Kelas 9A" required maxlength="255">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="customLink">Custom Link (opsional)</label>
+          <input id="customLink" class="form-input" placeholder="contoh: quiz-tata-surya" maxlength="20">
+          <p class="form-hint">Hanya huruf, angka, dan tanda hubung (-). Maksimal 20 karakter. Link: <span style="color:var(--primary-400)">/v/&lt;custom-link&gt;</span></p>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Panduan Wrapper</label>
+          <div class="prompt-content" style="white-space:normal">
+            Untuk penilaian otomatis, HTML Anda harus mengirim nilai ke wrapper dengan:
+            <code style="display:block;margin-top:.5rem;color:var(--primary-300)">window.parent.postMessage({ action: 'KIRIM_NILAI', skor: X, answers: {...} }, '*');</code>
+            Salin contoh lengkap dari <a href="/dashboard/prompt" style="color:var(--primary-400)">Pustaka Prompt</a>.
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg w-full" id="uploadBtn">⬆️ Upload &amp; Buat Shortlink</button>
+      </form>
+    </div>
+  </main>
+
+  {{template "dashboard-script" .}}
+  <script>
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  let selectedFile = null;
+
+  dropZone.addEventListener('click', function () { fileInput.click(); });
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    dropZone.addEventListener(ev, function (e) { e.preventDefault(); dropZone.classList.add('dragging'); });
+  });
+  ['dragleave', 'drop'].forEach(function (ev) {
+    dropZone.addEventListener(ev, function (e) { e.preventDefault(); dropZone.classList.remove('dragging'); });
+  });
+  dropZone.addEventListener('drop', function (e) { if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]); });
+  fileInput.addEventListener('change', function () { if (fileInput.files.length) setFile(fileInput.files[0]); });
+
+  function setFile(file) {
+    const name = file.name.toLowerCase();
+    if (!name.endsWith('.html') && !name.endsWith('.htm')) {
+      showError('Hanya file .html atau .htm yang diperbolehkan'); return;
+    }
+    if (file.size > {{.MaxFileSizeBytes}}) {
+      showError('Ukuran file maksimal 5MB'); return;
+    }
+    selectedFile = file;
+    document.getElementById('fileSelected').style.display = 'flex';
+    document.getElementById('fileName').textContent = file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + ' MB)';
+    hideError();
+  }
+
+  function showError(msg) {
+    document.getElementById('uploadErrorText').textContent = msg;
+    document.getElementById('uploadError').style.display = 'flex';
+  }
+  function hideError() { document.getElementById('uploadError').style.display = 'none'; }
+
+  document.getElementById('uploadForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    hideError();
+    if (!selectedFile) { showError('Pilih file HTML terlebih dahulu'); return; }
+
+    const title = document.getElementById('title').value.trim();
+    const customLink = document.getElementById('customLink').value.trim();
+    if (!title) { showError('Judul modul wajib diisi'); return; }
+
+    const btn = document.getElementById('uploadBtn');
+    btn.disabled = true; btn.textContent = 'Mengupload...';
+
+    const fd = new FormData();
+    fd.append('file', selectedFile);
+    fd.append('title', title);
+    if (customLink) fd.append('customLink', customLink);
+
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal mengupload');
+      window.location.href = '/dashboard?msg=' + encodeURIComponent('Modul berhasil diupload! Link: /v/' + data.shortCode);
+    } catch (err) {
+      showError(err.message);
+      btn.disabled = false; btn.textContent = '⬆️ Upload & Buat Shortlink';
+    }
+  });
+  </script>
+</body>
+</html>
+{{end}}

@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ajarin_db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ajar
+      POSTGRES_PASSWORD: ajar
+      POSTGRES_DB: ajar
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ajar -d ajar"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  web:
+    build: .
+    container_name: ajarin_web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./uploads:/app/uploads
+    environment:
+      DATABASE_URL: postgres://ajar:ajar@db:5432/ajar?sslmode=disable
+      PORT: "3000"
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@ajar.in}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: ajarin_tunnel
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    depends_on:
+      - web
+
+volumes:
+  pgdata:

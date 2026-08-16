@@ -1,0 +1,82 @@
+{{define "layout-admin"}}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  {{template "head-common" .}}
+</head>
+<body>
+  <div id="sidebarBackdrop" class="sidebar-backdrop" style="display:none"></div>
+  {{template "sidebar" .}}
+
+  <main class="main-content">
+    {{template "mobile-topbar" .}}
+
+    <div class="page-header">
+      <h1>📊 Dashboard Admin</h1>
+      <p>Selamat datang kembali! Berikut ringkasan platform Ajar.in</p>
+    </div>
+
+    {{template "flash" .}}
+
+    <div class="stats-grid">
+      <div class="stat-card blue">
+        <div class="stat-card-icon">👨‍🏫</div>
+        <div class="stat-card-value">{{.Stats.TotalGuru}}</div>
+        <div class="stat-card-label">Total Guru</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-card-icon">📚</div>
+        <div class="stat-card-value">{{.Stats.TotalModules}}</div>
+        <div class="stat-card-label">Total Modul</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-card-icon">✍️</div>
+        <div class="stat-card-value">{{.Stats.TotalSubmissions}}</div>
+        <div class="stat-card-label">Siswa Mengerjakan</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-card-icon">💾</div>
+        <div class="stat-card-value">{{formatBytes .Stats.TotalStorageBytes}}</div>
+        <div class="stat-card-label">Total Storage</div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;gap:1rem;flex-wrap:wrap">
+      <h2 style="font-size:1.25rem">Semua Modul</h2>
+      <a href="/admin/guru" class="btn btn-primary btn-sm">👨‍🏫 Kelola Guru</a>
+    </div>
+
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Judul</th>
+            <th>Guru</th>
+            <th>Shortlink</th>
+            <th>Status</th>
+            <th>Siswa</th>
+            <th>Tanggal</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Modules}}
+          <tr>
+            <td data-label="Judul"><strong>{{.Title}}</strong></td>
+            <td data-label="Guru">{{.UserName}}</td>
+            <td data-label="Shortlink"><code style="font-size:.8rem;color:var(--primary-400)">/v/{{.ShortCode}}</code></td>
+            <td data-label="Status">{{if .IsActive}}<span class="badge badge-active">Aktif</span>{{else}}<span class="badge badge-suspended">Nonaktif</span>{{end}}</td>
+            <td data-label="Siswa">{{.SubCount}}</td>
+            <td data-label="Tanggal">{{formatDate .CreatedAt}}</td>
+          </tr>
+          {{else}}
+          <tr class="empty-table-row"><td colspan="6">Belum ada modul di platform.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  {{template "dashboard-script" .}}
+</body>
+</html>
+{{end}}

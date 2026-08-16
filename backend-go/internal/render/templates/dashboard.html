@@ -1,0 +1,172 @@
+{{define "layout-dashboard"}}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  {{template "head-common" .}}
+</head>
+<body>
+  <div id="sidebarBackdrop" class="sidebar-backdrop" style="display:none"></div>
+  {{template "sidebar" .}}
+
+  <main class="main-content">
+    {{template "mobile-topbar" .}}
+
+    <div class="page-header">
+      <h1>📊 Dashboard</h1>
+      <p>Selamat datang kembali, {{.User.Name}}! Berikut ringkasan modul pembelajaran Anda.</p>
+    </div>
+
+    {{template "flash" .}}
+
+    <div class="stats-grid">
+      <div class="stat-card blue">
+        <div class="stat-card-icon">📚</div>
+        <div class="stat-card-value">{{.Stats.TotalModules}}</div>
+        <div class="stat-card-label">Total Modul</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-card-icon">✍️</div>
+        <div class="stat-card-value">{{.Stats.TotalSubmissions}}</div>
+        <div class="stat-card-label">Siswa Mengerjakan</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-card-icon">💾</div>
+        <div class="stat-card-value">{{formatBytes .Stats.TotalStorageBytes}}</div>
+        <div class="stat-card-label">Storage Terpakai</div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;gap:1rem;flex-wrap:wrap">
+      <h2 style="font-size:1.25rem">Modul Pembelajaran</h2>
+      <a href="/dashboard/upload" class="btn btn-primary btn-sm">＋ Upload Modul Baru</a>
+    </div>
+
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Judul</th>
+            <th>Shortlink</th>
+            <th>Status</th>
+            <th>Siswa</th>
+            <th>Tanggal</th>
+            <th style="text-align:right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Modules}}
+          <tr>
+            <td data-label="Judul"><strong>{{.Title}}</strong></td>
+            <td data-label="Shortlink">
+              <span style="display:flex;align-items:center;gap:.5rem">
+                <code style="font-size:.8rem;color:var(--primary-400)">/v/{{.ShortCode}}</code>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="copyToClipboard(window.location.origin + '/v/{{.ShortCode}}', this)">📋</button>
+              </span>
+            </td>
+            <td data-label="Status">
+              {{if .IsActive}}<span class="badge badge-active">Aktif</span>{{else}}<span class="badge badge-suspended">Nonaktif</span>{{end}}
+            </td>
+            <td data-label="Siswa">{{.SubCount}}</td>
+            <td data-label="Tanggal">{{formatDate .CreatedAt}}</td>
+            <td data-label="Aksi">
+              <div class="table-actions" style="justify-content:flex-end">
+                <a href="/dashboard/rekap/{{.ID}}" class="btn btn-secondary btn-sm" title="Lihat rekap">📊 Rekap</a>
+                <button type="button" class="btn btn-secondary btn-sm" title="Edit"
+                  onclick='openEdit("{{.ID}}", {{js .Title}}, {{js .ShortCode}})'>✏️</button>
+                <button type="button" class="btn btn-secondary btn-sm" title="Toggle aktif"
+                  onclick="toggleActive('{{.ID}}', {{.IsActive}})">{{if .IsActive}}⏸️ Nonaktifkan{{else}}▶️ Aktifkan{{end}}</button>
+                <button type="button" class="btn btn-danger btn-sm" title="Hapus"
+                  onclick="deleteModule('{{.ID}}')">🗑️</button>
+              </div>
+            </td>
+          </tr>
+          {{else}}
+          <tr class="empty-table-row"><td colspan="6">Belum ada modul. Upload media pembelajaran pertama Anda! 🚀</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- Modal Edit -->
+  <div id="editModal" class="modal-overlay" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>✏️ Edit Modul</h3>
+        <button type="button" class="btn btn-ghost" onclick="closeEdit()">✕</button>
+      </div>
+      <form id="editForm">
+        <input type="hidden" id="editId">
+        <div class="form-group">
+          <label class="form-label" for="editTitle">Judul Modul</label>
+          <input id="editTitle" class="form-input" required maxlength="255">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="editCode">Custom Link (opsional)</label>
+          <input id="editCode" class="form-input" placeholder="contoh: quiz-ipa-9a" maxlength="20">
+          <p class="form-hint">Hanya huruf, angka, dan tanda hubung (-). Maksimal 20 karakter.</p>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+            <input type="checkbox" id="editActive" style="width:16px;height:16px"> Aktif (bisa diakses siswa)
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeEdit()">Batal</button>
+          <button type="submit" class="btn btn-primary" id="saveEditBtn">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {{template "copy-script" .}}
+  {{template "dashboard-script" .}}
+  <script>
+  function openEdit(id, title, code) {
+    document.getElementById('editId').value = id;
+    document.getElementById('editTitle').value = title || '';
+    document.getElementById('editCode').value = code || '';
+    document.getElementById('editModal').style.display = 'flex';
+  }
+  function closeEdit() { document.getElementById('editModal').style.display = 'none'; }
+  document.getElementById('editForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const id = document.getElementById('editId').value;
+    const btn = document.getElementById('saveEditBtn');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+    try {
+      const res = await fetch('/api/modules/' + id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: document.getElementById('editTitle').value.trim(),
+          shortCode: document.getElementById('editCode').value.trim(),
+          isActive: document.getElementById('editActive').checked,
+        }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Gagal menyimpan'); }
+      window.location.href = '/dashboard?msg=' + encodeURIComponent('Modul berhasil diperbarui');
+    } catch (err) {
+      alert(err.message); btn.disabled = false; btn.textContent = 'Simpan';
+    }
+  });
+  async function toggleActive(id, current) {
+    if (!confirm(current ? 'Nonaktifkan modul ini? Siswa tidak bisa mengaksesnya.' : 'Aktifkan modul ini?')) return;
+    const res = await fetch('/api/modules/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive: !current }),
+    });
+    if (res.ok) window.location.reload();
+    else alert('Gagal mengubah status');
+  }
+  async function deleteModule(id) {
+    if (!confirm('Yakin ingin menghapus modul ini? Semua rekap nilai siswa akan ikut terhapus.')) return;
+    const res = await fetch('/api/modules/' + id, { method: 'DELETE' });
+    if (res.ok) window.location.href = '/dashboard?msg=' + encodeURIComponent('Modul berhasil dihapus');
+    else alert('Gagal menghapus modul');
+  }
+  </script>
+</body>
+</html>
+{{end}}

@@ -1,0 +1,178 @@
+{{define "layout-admin-guru"}}
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  {{template "head-common" .}}
+</head>
+<body>
+  <div id="sidebarBackdrop" class="sidebar-backdrop" style="display:none"></div>
+  {{template "sidebar" .}}
+
+  <main class="main-content">
+    {{template "mobile-topbar" .}}
+
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap" class="page-header">
+      <div>
+        <h1>👨‍🏫 Kelola Guru</h1>
+        <p>Buat akun guru, reset password, atau nonaktifkan akun.</p>
+      </div>
+      <button type="button" class="btn btn-primary" onclick="openCreate()">＋ Tambah Guru</button>
+    </div>
+
+    {{template "flash" .}}
+
+    <div class="table-container">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Nama</th>
+            <th>Email</th>
+            <th>Modul</th>
+            <th>Status</th>
+            <th>Terdaftar</th>
+            <th style="text-align:right">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Guru}}
+          <tr>
+            <td data-label="Nama"><strong>{{.Name}}</strong></td>
+            <td data-label="Email">{{.Email}}</td>
+            <td data-label="Modul">{{.ModuleCount}}</td>
+            <td data-label="Status">
+              {{if eq .Status "active"}}<span class="badge badge-active">Aktif</span>{{else}}<span class="badge badge-suspended">Nonaktif</span>{{end}}
+            </td>
+            <td data-label="Terdaftar">{{formatDate .CreatedAt}}</td>
+            <td data-label="Aksi">
+              <div class="table-actions" style="justify-content:flex-end">
+                <button type="button" class="btn btn-secondary btn-sm"
+                  onclick='openEdit("{{.ID}}", {{js .Name}}, {{js .Email}}, "{{.Status}}")'>✏️ Edit</button>
+                <button type="button" class="btn btn-secondary btn-sm" title="Reset password"
+                  onclick="resetPassword('{{.ID}}','{{.Name}}')">🔑</button>
+                <button type="button" class="btn btn-secondary btn-sm"
+                  onclick="toggleStatus('{{.ID}}', '{{.Status}}')">{{if eq .Status "active"}}⛔ Nonaktifkan{{else}}✅ Aktifkan{{end}}</button>
+                <button type="button" class="btn btn-danger btn-sm" onclick="deleteGuru('{{.ID}}','{{.Name}}')">🗑️</button>
+              </div>
+            </td>
+          </tr>
+          {{else}}
+          <tr class="empty-table-row"><td colspan="6">Belum ada akun guru.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- Modal Tambah/Edit -->
+  <div id="guruModal" class="modal-overlay" style="display:none">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="guruModalTitle">＋ Tambah Guru</h3>
+        <button type="button" class="btn btn-ghost" onclick="closeModal()">✕</button>
+      </div>
+      <form id="guruForm">
+        <input type="hidden" id="guruId">
+        <div class="form-group">
+          <label class="form-label" for="guruName">Nama Lengkap</label>
+          <input id="guruName" class="form-input" required maxlength="100">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="guruEmail">Email</label>
+          <input id="guruEmail" type="email" class="form-input" required maxlength="255">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="guruPass">Password <span id="passHint">(minimal 6 karakter)</span></label>
+          <input id="guruPass" type="password" class="form-input" minlength="6">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Batal</button>
+          <button type="submit" class="btn btn-primary" id="guruSubmitBtn">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {{template "dashboard-script" .}}
+  <script>
+  function openCreate() {
+    document.getElementById('guruModalTitle').textContent = '＋ Tambah Guru';
+    document.getElementById('guruId').value = '';
+    document.getElementById('guruName').value = '';
+    document.getElementById('guruEmail').value = '';
+    document.getElementById('guruPass').value = '';
+    document.getElementById('guruPass').required = true;
+    document.getElementById('passHint').textContent = '(minimal 6 karakter)';
+    document.getElementById('guruModal').style.display = 'flex';
+  }
+  function openEdit(id, name, email, status) {
+    document.getElementById('guruModalTitle').textContent = '✏️ Edit Guru';
+    document.getElementById('guruId').value = id;
+    document.getElementById('guruName').value = name;
+    document.getElementById('guruEmail').value = email;
+    document.getElementById('guruPass').value = '';
+    document.getElementById('guruPass').required = false;
+    document.getElementById('passHint').textContent = '(kosongkan jika tidak diganti)';
+    document.getElementById('guruModal').style.display = 'flex';
+  }
+  function closeModal() { document.getElementById('guruModal').style.display = 'none'; }
+
+  document.getElementById('guruForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const id = document.getElementById('guruId').value;
+    const btn = document.getElementById('guruSubmitBtn');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+    const body = {
+      name: document.getElementById('guruName').value.trim(),
+      email: document.getElementById('guruEmail').value.trim(),
+    };
+    const pass = document.getElementById('guruPass').value;
+    if (pass) body.password = pass;
+
+    try {
+      const res = await fetch(id ? '/api/admin/guru/' + id : '/api/admin/guru', {
+        method: id ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal menyimpan');
+      window.location.href = '/admin/guru?msg=' + encodeURIComponent(id ? 'Guru berhasil diperbarui' : 'Akun guru berhasil dibuat');
+    } catch (err) {
+      alert(err.message); btn.disabled = false; btn.textContent = 'Simpan';
+    }
+  });
+
+  async function toggleStatus(id, status) {
+    const next = status === 'active' ? 'suspended' : 'active';
+    if (!confirm(next === 'suspended' ? 'Nonaktifkan akun ini? Guru tidak bisa login.' : 'Aktifkan kembali akun ini?')) return;
+    const res = await fetch('/api/admin/guru/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: next }),
+    });
+    if (res.ok) window.location.reload();
+    else alert('Gagal mengubah status');
+  }
+
+  async function resetPassword(id, name) {
+    const pass = prompt('Password baru untuk ' + name + ' (minimal 6 karakter):');
+    if (!pass || pass.length < 6) { alert('Password minimal 6 karakter'); return; }
+    const res = await fetch('/api/admin/guru/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pass }),
+    });
+    if (res.ok) alert('Password berhasil direset!');
+    else alert('Gagal mereset password');
+  }
+
+  async function deleteGuru(id, name) {
+    if (!confirm('Yakin ingin menghapus akun ' + name + '? Semua modul dan rekapnya akan ikut terhapus.')) return;
+    const res = await fetch('/api/admin/guru/' + id, { method: 'DELETE' });
+    if (res.ok) window.location.href = '/admin/guru?msg=' + encodeURIComponent('Akun guru berhasil dihapus');
+    else alert('Gagal menghapus akun');
+  }
+  </script>
+</body>
+</html>
+{{end}}
