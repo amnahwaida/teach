@@ -87,3 +87,22 @@ satu binary + volume uploads.
   multi-instance, pindahkan ke Redis.
 - `clientIP` hanya memakai `RemoteAddr` (bukan `X-Forwarded-For`). Saat
   berjalan di belakang banyak proxy, ganti dengan daftar trusted proxy.
+
+## Testing
+
+Unit test (tanpa DB):
+
+```bash
+go test ./...
+```
+
+Integration test (butuh PostgreSQL, gunakan service `db` dari compose):
+
+```bash
+docker compose up -d db
+go test -v ./internal/handlers/
+```
+
+Integration test otomatis membuat database `ajar_test` (migrasi + TRUNCATE
+tiap test) dan `t.Skip` bila DB tidak tersedia. Atur `TEST_DATABASE_URL`
+untuk menimpa koneksi default `postgres://ajar:ajar@localhost:5432/ajar`.

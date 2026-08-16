@@ -337,9 +337,15 @@ func (s *Server) apiGuruDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func validEmail(email string) bool {
-	if len(email) < 5 || len(email) > 255 || !strings.Contains(email, "@") {
+	if len(email) < 5 || len(email) > 255 || strings.ContainsAny(email, " \t\r\n") {
 		return false
 	}
 	at := strings.LastIndex(email, "@")
-	return at > 0 && at < len(email)-2 && !strings.Contains(email[at+1:], "@") && strings.Contains(email[at+1:], ".")
+	// tepat satu @, ada isi sebelum @, dan domain memiliki titik yang diapit isi
+	if at <= 0 || at == len(email)-1 || strings.Contains(email[:at], "@") {
+		return false
+	}
+	domain := email[at+1:]
+	dot := strings.Index(domain, ".")
+	return dot > 0 && dot < len(domain)-1
 }
