@@ -20,18 +20,20 @@ type ctxKey int
 const userKey ctxKey = 0
 
 type Server struct {
-	cfg      *config.Config
-	pool     *pgxpool.Pool
-	sessions *session.Store
-	limiter  *submissionLimiter
+	cfg          *config.Config
+	pool         *pgxpool.Pool
+	sessions     *session.Store
+	limiter      *ipLimiter
+	loginLimiter *ipLimiter
 }
 
 func NewServer(cfg *config.Config, pool *pgxpool.Pool) *Server {
 	return &Server{
-		cfg:      cfg,
-		pool:     pool,
-		sessions: session.NewStore(pool, cfg.SessionMaxAgeSec, cfg.SessionCookie),
-		limiter:  newSubmissionLimiter(),
+		cfg:          cfg,
+		pool:         pool,
+		sessions:     session.NewStore(pool, cfg.SessionMaxAgeSec, cfg.SessionCookie),
+		limiter:      newIPLimiter(limiterMax, limiterEvery),
+		loginLimiter: newIPLimiter(loginLimiterMax, loginLimiterEvery),
 	}
 }
 

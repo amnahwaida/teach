@@ -1,8 +1,8 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -16,6 +16,30 @@ import (
 type GuruRow struct {
 	models.User
 	ModuleCount int64
+}
+
+func (s *Server) queryGuruList(r *http.Request) ([]GuruRow, error) {
+	rows, err := s.pool.Query(r.Context(), `
+		SELECT u.id, u.name, u.email, u.role, u.status, u.created_at,
+		       (SELECT count(*) FROM modules m WHERE m.user_id = u.id)
+		FROM users u
+		WHERE u.role = 'guru'
+		ORDER BY u.created_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var guru []GuruRow
+	for rows.Next() {
+		var g GuruRow
+		if err := rows.Scan(&g.ID, &g.Name, &g.Email, &g.Role, &g.Status, &g.CreatedAt, &g.ModuleCount); err != nil {
+			return nil, err
+		}
+		guru = append(guru, g)
+	}
+	return guru, rows.Err()
 }
 
 func (s *Server) adminPage(w http.ResponseWriter, r *http.Request) {
@@ -52,9 +76,11 @@ func (s *Server) adminPage(w http.ResponseWriter, r *http.Request) {
 	var modules []*models.Module
 	for rows.Next() {
 		var m models.Module
-		if err := rows.Scan(&m.ID, &m.Title, &m.ShortCode, &m.IsActive, &m.CreatedAt, &m.SubCount, &m.UserName); err == nil {
-			modules = append(modules, &m)
+		if err := rows.Scan(&m.ID, &m.Title, &m.ShortCode, &m.IsActive, &m.CreatedAt, &m.SubCount, &m.UserName); err != nil {
+			log.Printf("skip baris modul: %v", err)
+			continue
 		}
+		modules = append(modules, &m)
 	}
 
 	render.View(w, "admin", struct {
@@ -72,27 +98,10 @@ func (s *Server) adminGuruPage(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
 	flash, flashErr := flashParse(r)
 
-	rows, err := s.pool.Query(r.Context(), `
-		SELECT u.id, u.name, u.email, u.role, u.status, u.created_at,
-		       (SELECT count(*) FROM modules m WHERE m.user_id = u.id)
-		FROM users u
-		WHERE u.role = 'guru'
-		ORDER BY u.created_at DESC
-	`)
+	guru, err := s.queryGuruList(r)
 	if err != nil {
 		serverError(w, "Gagal memuat daftar guru", err)
 		return
-	}
-	defer rows.Close()
-
-	var guru []GuruRow
-	for rows.Next() {
-		var g GuruRow
-		if err := rows.Scan(&g.ID, &g.Name, &g.Email, &g.Role, &g.Status, &g.CreatedAt, &g.ModuleCount); err != nil {
-			serverError(w, "Gagal membaca daftar guru", err)
-			return
-		}
-		guru = append(guru, g)
 	}
 
 	render.View(w, "admin-guru", struct {
@@ -107,27 +116,10 @@ func (s *Server) adminGuruPage(w http.ResponseWriter, r *http.Request) {
 // ---------- API ----------
 
 func (s *Server) apiGuruList(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.pool.Query(r.Context(), `
-		SELECT u.id, u.name, u.email, u.role, u.status, u.created_at,
-		       (SELECT count(*) FROM modules m WHERE m.user_id = u.id)
-		FROM users u
-		WHERE u.role = 'guru'
-		ORDER BY u.created_at DESC
-	`)
+	guru, err := s.queryGuruList(r)
 	if err != nil {
 		serverError(w, "Gagal memuat daftar guru", err)
 		return
-	}
-	defer rows.Close()
-
-	var guru []GuruRow
-	for rows.Next() {
-		var g GuruRow
-		if err := rows.Scan(&g.ID, &g.Name, &g.Email, &g.Role, &g.Status, &g.CreatedAt, &g.ModuleCount); err != nil {
-			serverError(w, "Gagal membaca daftar guru", err)
-			return
-		}
-		guru = append(guru, g)
 	}
 	render.JSON(w, http.StatusOK, map[string]any{"guru": guru})
 }
@@ -230,9 +222,12 @@ func (s *Server) apiGuruUpdate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var taken bool
-		_ = s.pool.QueryRow(r.Context(),
+		if err := s.pool.QueryRow(r.Context(),
 			`SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 AND id <> $2)`,
-			req.Email, id).Scan(&taken)
+			req.Email, id).Scan(&taken); err != nil {
+			serverError(w, "Gagal memeriksa email", err)
+			return
+		}
 		if taken {
 			render.Error(w, http.StatusConflict, "Email sudah terdaftar")
 			return
@@ -269,16 +264,7 @@ func (s *Server) apiGuruUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := "UPDATE users SET "
-	args := []any{}
-	i := 1
-	for col, val := range set {
-		query += col + " = $" + strconv.Itoa(i) + ", "
-		args = append(args, val)
-		i++
-	}
-	query = query[:len(query)-2] + " WHERE id = $" + strconv.Itoa(i) + " RETURNING id"
-	args = append(args, id)
+	query, args := buildUpdateQuery("users", "id", set, id)
 
 	var updatedID string
 	if err := s.pool.QueryRow(r.Context(), query, args...).Scan(&updatedID); err != nil {
@@ -326,14 +312,20 @@ func (s *Server) apiGuruDelete(w http.ResponseWriter, r *http.Request) {
 	// hapus file modul guru sebelum user dihapus (cascade menghapus record DB)
 	rows, err := s.pool.Query(r.Context(),
 		`SELECT file_path FROM modules WHERE user_id = $1`, id)
-	if err == nil {
-		for rows.Next() {
-			var fp string
-			if rows.Scan(&fp) == nil {
-				_ = s.removeModuleFile(fp)
-			}
+	if err != nil {
+		serverError(w, "Gagal memuat modul guru", err)
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var fp string
+		if err := rows.Scan(&fp); err != nil {
+			log.Printf("skip file_path guru %s: %v", id, err)
+			continue
 		}
-		rows.Close()
+		if err := s.removeModuleFile(fp); err != nil {
+			log.Printf("gagal menghapus file %s: %v", fp, err)
+		}
 	}
 
 	if _, err := s.pool.Exec(r.Context(), `DELETE FROM users WHERE id = $1`, id); err != nil {
@@ -351,4 +343,3 @@ func validEmail(email string) bool {
 	at := strings.LastIndex(email, "@")
 	return at > 0 && at < len(email)-2 && !strings.Contains(email[at+1:], "@") && strings.Contains(email[at+1:], ".")
 }
-

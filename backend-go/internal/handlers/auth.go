@@ -3,10 +3,17 @@ package handlers
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/vannyezha/ajar-in/internal/auth"
 	"github.com/vannyezha/ajar-in/internal/models"
 	"github.com/vannyezha/ajar-in/internal/render"
+)
+
+// batas percobaan login per IP
+const (
+	loginLimiterMax   = 10
+	loginLimiterEvery = 15 * time.Minute
 )
 
 func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
@@ -15,8 +22,6 @@ func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	base := render.PageData{Title: "Masuk"}
-	_, err := flashParse(r)
-	_ = err
 
 	// login page pakai query ?err=
 	base.FlashErr = r.URL.Query().Get("err")
@@ -34,6 +39,11 @@ func (s *Server) loginPost(w http.ResponseWriter, r *http.Request) {
 
 	if email == "" || password == "" {
 		http.Redirect(w, r, "/login?err="+urlEscape("Email dan password wajib diisi"), http.StatusFound)
+		return
+	}
+
+	if !s.loginLimiter.Allow(clientIP(r)) {
+		http.Redirect(w, r, "/login?err="+urlEscape("Terlalu banyak percobaan masuk. Coba lagi nanti."), http.StatusFound)
 		return
 	}
 
@@ -104,6 +114,11 @@ func (s *Server) apiLogin(w http.ResponseWriter, r *http.Request) {
 
 	if req.Email == "" || req.Password == "" {
 		render.Error(w, http.StatusBadRequest, "Email dan password wajib diisi")
+		return
+	}
+
+	if !s.loginLimiter.Allow(clientIP(r)) {
+		render.Error(w, http.StatusTooManyRequests, "Terlalu banyak percobaan masuk. Coba lagi nanti.")
 		return
 	}
 

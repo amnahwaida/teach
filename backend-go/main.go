@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -47,6 +46,8 @@ func main() {
 		Addr:              ":" + cfg.Port,
 		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
 
@@ -112,5 +113,3 @@ func sessionCleanupLoop(ctx context.Context, pool *pgxpool.Pool) {
 		}
 	}
 }
-
-var _ = os.Getenv

@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -99,7 +98,6 @@ func (s *Server) serveModule(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(w, f)
 }
 
-
 // ---------- Submission ----------
 
 type submissionRequest struct {
@@ -169,16 +167,14 @@ func (s *Server) createSubmission(w http.ResponseWriter, r *http.Request) {
 	if req.AnswersJSON != nil {
 		answers = *req.AnswersJSON
 		if len(answers) > maxAnswersJSONLen {
-			answers = answers[:maxAnswersJSONLen]
+			render.Error(w, http.StatusBadRequest, "Jawaban terlalu panjang (maksimal 100KB)")
+			return
 		}
 		// pastikan JSON valid agar tidak mengotori DB
 		var probe any
 		if json.Unmarshal([]byte(answers), &probe) != nil {
 			answers = ""
 		}
-	}
-	if answers == "" && req.AnswersJSON != nil {
-		answers = ""
 	}
 
 	var id string
@@ -287,50 +283,10 @@ func safeFileName(s string) string {
 	return s
 }
 
-// ---------- Rate limiter sederhana (in-memory) ----------
-
-type submissionLimiter struct {
-	mu    sync.Mutex
-	count map[string]int
-	until map[string]time.Time
-}
+// ---------- Rate limiter ----------
 
 // batas: maksimal 5 submit per 10 menit per kunci (modul+IP)
 const (
 	limiterMax   = 5
 	limiterEvery = 10 * time.Minute
 )
-
-func newSubmissionLimiter() *submissionLimiter {
-	return &submissionLimiter{count: map[string]int{}, until: map[string]time.Time{}}
-}
-
-func (l *submissionLimiter) Allow(key string) bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	now := time.Now()
-	if t, ok := l.until[key]; ok && now.After(t) {
-		delete(l.count, key)
-		delete(l.until, key)
-	}
-
-	l.count[key]++
-	if l.count[key] > limiterMax {
-		l.until[key] = now.Add(limiterEvery)
-		return false
-	}
-	return true
-}
-
-func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		return strings.TrimSpace(parts[0])
-	}
-	host := r.RemoteAddr
-	if i := strings.LastIndex(host, ":"); i > 0 {
-		return host[:i]
-	}
-	return host
-}

@@ -25,7 +25,11 @@ func (s *Server) dashboardPage(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
 	flash, flashErr := flashParse(r)
 
-	stats := s.statsFor(r, u)
+	stats, err := s.statsFor(r, u)
+	if err != nil {
+		serverError(w, "Gagal memuat statistik", err)
+		return
+	}
 
 	var modules []*models.Module
 	if u.Role == models.RoleAdmin {
@@ -37,14 +41,18 @@ func (s *Server) dashboardPage(w http.ResponseWriter, r *http.Request) {
 			JOIN users u ON u.id = m.user_id
 			ORDER BY m.created_at DESC
 		`)
-		if err == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var m models.Module
-				if err := rows.Scan(&m.ID, &m.Title, &m.ShortCode, &m.IsActive, &m.CreatedAt, &m.SubCount, &m.UserName); err == nil {
-					modules = append(modules, &m)
-				}
+		if err != nil {
+			serverError(w, "Gagal memuat modul", err)
+			return
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var m models.Module
+			if err := rows.Scan(&m.ID, &m.Title, &m.ShortCode, &m.IsActive, &m.CreatedAt, &m.SubCount, &m.UserName); err != nil {
+				log.Printf("skip baris modul: %v", err)
+				continue
 			}
+			modules = append(modules, &m)
 		}
 	} else {
 		rows, err := s.pool.Query(r.Context(), `
@@ -54,14 +62,18 @@ func (s *Server) dashboardPage(w http.ResponseWriter, r *http.Request) {
 			WHERE m.user_id = $1
 			ORDER BY m.created_at DESC
 		`, u.ID)
-		if err == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var m models.Module
-				if err := rows.Scan(&m.ID, &m.Title, &m.ShortCode, &m.IsActive, &m.CreatedAt, &m.SubCount); err == nil {
-					modules = append(modules, &m)
-				}
+		if err != nil {
+			serverError(w, "Gagal memuat modul", err)
+			return
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var m models.Module
+			if err := rows.Scan(&m.ID, &m.Title, &m.ShortCode, &m.IsActive, &m.CreatedAt, &m.SubCount); err != nil {
+				log.Printf("skip baris modul: %v", err)
+				continue
 			}
+			modules = append(modules, &m)
 		}
 	}
 
@@ -198,19 +210,24 @@ func (s *Server) apiStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stats := s.statsFor(r, u)
+	stats, err := s.statsFor(r, u)
+	if err != nil {
+		serverError(w, "Gagal memuat statistik", err)
+		return
+	}
 	render.JSON(w, http.StatusOK, stats)
+	return
 }
 
-func (s *Server) statsFor(r *http.Request, u *models.User) models.Stats {
+func (s *Server) statsFor(r *http.Request, u *models.User) (models.Stats, error) {
 	var stats models.Stats
-	_ = s.pool.QueryRow(r.Context(), `
+	err := s.pool.QueryRow(r.Context(), `
 		SELECT
 		  (SELECT count(*) FROM modules WHERE user_id = $1),
 		  (SELECT count(*) FROM submissions sub JOIN modules m ON m.id = sub.module_id WHERE m.user_id = $1),
 		  (SELECT COALESCE(sum(file_size_bytes), 0) FROM modules WHERE user_id = $1)
 	`, u.ID).Scan(&stats.TotalModules, &stats.TotalSubmissions, &stats.TotalStorageBytes)
-	return stats
+	return stats, err
 }
 
 func (s *Server) apiModules(w http.ResponseWriter, r *http.Request) {
@@ -308,9 +325,12 @@ func (s *Server) apiModuleUpdate(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			var exists bool
-			_ = s.pool.QueryRow(r.Context(),
+			if err := s.pool.QueryRow(r.Context(),
 				`SELECT EXISTS(SELECT 1 FROM modules WHERE short_code = $1 AND id <> $2)`,
-				code, id).Scan(&exists)
+				code, id).Scan(&exists); err != nil {
+				serverError(w, "Gagal memeriksa custom link", err)
+				return
+			}
 			if exists {
 				render.Error(w, http.StatusConflict, "Custom link sudah digunakan")
 				return
@@ -330,17 +350,8 @@ func (s *Server) apiModuleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// bangun query dinamis
-	query := "UPDATE modules SET "
-	args := []any{}
-	i := 1
-	for col, val := range set {
-		query += fmt.Sprintf("%s = $%d, ", col, i)
-		args = append(args, val)
-		i++
-	}
-	query = query[:len(query)-2] + fmt.Sprintf(" WHERE id = $%d RETURNING id", i)
-	args = append(args, id)
+	// bangun query dinamis (kolom berasal dari whitelist kunci request)
+	query, args := buildUpdateQuery("modules", "id", set, id)
 
 	var newID string
 	if err := s.pool.QueryRow(r.Context(), query, args...).Scan(&newID); err != nil {
@@ -414,10 +425,6 @@ func (s *Server) removeModuleFile(filePath string) error {
 
 // ---------- Upload ----------
 
-const (
-	htmlMaxExtLen = 10
-)
-
 var allowedExt = map[string]bool{".html": true, ".htm": true}
 
 func (s *Server) apiUpload(w http.ResponseWriter, r *http.Request) {
@@ -485,8 +492,11 @@ func (s *Server) apiUpload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var exists bool
-		_ = s.pool.QueryRow(r.Context(),
-			`SELECT EXISTS(SELECT 1 FROM modules WHERE short_code = $1)`, customLink).Scan(&exists)
+		if err := s.pool.QueryRow(r.Context(),
+			`SELECT EXISTS(SELECT 1 FROM modules WHERE short_code = $1)`, customLink).Scan(&exists); err != nil {
+			serverError(w, "Gagal memeriksa custom link", err)
+			return
+		}
 		if exists {
 			render.Error(w, http.StatusConflict, "Custom link sudah digunakan, silakan pilih yang lain")
 			return
@@ -497,12 +507,13 @@ func (s *Server) apiUpload(w http.ResponseWriter, r *http.Request) {
 	// 5. Simpan file dengan nama UUID
 	fileName := fmt.Sprintf("%s%s", randomUUID(), ext)
 	destPath := filepath.Join(s.cfg.UploadDir, fileName)
-	if err := writeFile(destPath, file, s.cfg.MaxFileSizeBytes); err != nil {
+	nWritten, err := writeFile(destPath, file, s.cfg.MaxFileSizeBytes)
+	if err != nil {
 		serverError(w, "Gagal menyimpan file", err)
 		return
 	}
 
-	// 6. Buat record modul (retry bila shortCode bentrok)
+	// 6. Buat record modul (retry hanya untuk shortcode acak)
 	for attempt := 0; attempt < 3; attempt++ {
 		if shortCode == "" {
 			shortCode = randomShortCode(8)
@@ -512,7 +523,7 @@ func (s *Server) apiUpload(w http.ResponseWriter, r *http.Request) {
 			INSERT INTO modules (user_id, title, short_code, file_path, file_size_bytes)
 			VALUES ($1, $2, $3, $4, $5)
 			RETURNING id
-		`, u.ID, title, shortCode, fileName, fileHeader.Size).Scan(&moduleID)
+		`, u.ID, title, shortCode, fileName, nWritten).Scan(&moduleID)
 		if err == nil {
 			render.JSON(w, http.StatusCreated, map[string]any{
 				"shortCode": shortCode,
@@ -520,9 +531,18 @@ func (s *Server) apiUpload(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
-		if db.IsUniqueViolation(err) && attempt < 2 {
-			shortCode = "" // regenerate
-			continue
+		if db.IsUniqueViolation(err) {
+			if customLink != "" {
+				// custom link bentrok karena race setelah cek EXISTS:
+				// jangan diam-diam mengganti link pilihan guru
+				_ = os.Remove(destPath)
+				render.Error(w, http.StatusConflict, "Custom link sudah digunakan, silakan pilih yang lain")
+				return
+			}
+			if attempt < 2 {
+				shortCode = "" // regenerate
+				continue
+			}
 		}
 		// gagal permanen: bersihkan file
 		_ = os.Remove(destPath)
@@ -541,13 +561,26 @@ func randomUUID() string {
 
 const shortCodeAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
+// bit batas bawah kelipatan 62 terbesar yang < 256 (reject sampling
+// menghilangkan bias modular pada randomShortCode)
+const shortCodeReject = uint8(256 - 256%len(shortCodeAlphabet))
+
 func randomShortCode(n int) string {
-	b := make([]byte, n)
-	_, _ = rand.Read(b)
-	for i := range b {
-		b[i] = shortCodeAlphabet[int(b[i])%len(shortCodeAlphabet)]
+	out := make([]byte, n)
+	buf := make([]byte, n*2)
+	for i := 0; i < n; {
+		_, _ = rand.Read(buf)
+		for _, c := range buf {
+			if i >= n {
+				break
+			}
+			if c < shortCodeReject {
+				out[i] = shortCodeAlphabet[int(c)%len(shortCodeAlphabet)]
+				i++
+			}
+		}
 	}
-	return string(b)
+	return string(out)
 }
 
 func isValidShortCode(code string) bool {
@@ -563,20 +596,21 @@ func matchAlnumDash(code string) bool {
 	return true
 }
 
-func writeFile(dest string, src io.Reader, maxBytes int64) error {
+// writeFile menyalin konten ke dest dan mengembalikan jumlah byte aktual.
+func writeFile(dest string, src io.Reader, maxBytes int64) (int64, error) {
 	f, err := os.Create(dest)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer f.Close()
 	n, err := io.Copy(f, src)
 	if err != nil {
-		return err
+		return n, err
 	}
 	if n > maxBytes {
-		return errors.New("file terlalu besar")
+		return n, errors.New("file terlalu besar")
 	}
-	return nil
+	return n, nil
 }
 
 func serverError(w http.ResponseWriter, msg string, err error) {

@@ -22,6 +22,10 @@ server-rendered dengan `html/template`, PostgreSQL, session server-side.
 | Siswa melihat "sukses" walau submit gagal | Halaman error + tombol "Coba Kirim Ulang" |
 | CSV manual tanpa escaping | `encoding/csv` + BOM |
 | `.env` secret sederhana | `.env` via compose, admin dibuat otomatis saat start |
+| Rate limit bisa dilewati header `X-Forwarded-For` | IP klien hanya dari `RemoteAddr` (XFF tidak dipercaya) |
+| Login tanpa batasan percobaan | Rate limit login 10 percobaan/15 mnt per IP (form + API) |
+| Body JSON tak terbatas | `MaxBytesReader` 1MB di semua endpoint JSON |
+| Slowloris / koneksi macet | `ReadTimeout`/`WriteTimeout` di `http.Server` |
 
 ## Menjalankan
 
@@ -79,5 +83,7 @@ satu binary + volume uploads.
 - File modul disimpan di `uploads/` (volume persist di compose). Untuk skala
   lebih besar, ganti dengan object storage (R2/S3) — cukup ubah `apiUpload`,
   `serveModule`, dan `removeModuleFile`.
-- Rate limiter submission in-memory (per instance). Untuk multi-instance,
-  pindahkan ke Redis.
+- Rate limiter submission & login in-memory (per instance). Untuk
+  multi-instance, pindahkan ke Redis.
+- `clientIP` hanya memakai `RemoteAddr` (bukan `X-Forwarded-For`). Saat
+  berjalan di belakang banyak proxy, ganti dengan daftar trusted proxy.
